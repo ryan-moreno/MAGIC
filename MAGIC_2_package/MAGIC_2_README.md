@@ -11,8 +11,7 @@ MAGIC_2_ requires Matrix files that can be downloaded from:
 https://go.wisc.edu/magic
 
 Download Matrices.zip and unpack.
-Place unzipped folder in the same directory/folder as MAGIC.py prior to running MAGIC_2_.py
-
+Place unzipped folder in the same directory/folder as _magic.py prior to running MAGIC_2_.py
 
 Implementation of MAGIC_2.
 MAGIC2 accepts command line inputs.  If none are provided, a file path to the lists file will be requested by the script upon running.
@@ -53,3 +52,19 @@ An Auxiliary_Files directory contains 2 sub directories:
 'Distributions' contains html files showing the PDFs and CDFs for ChIP values in the query and master list for each gene in the ENCODE experiment
 'Target_Data_' contains comma separated text files for each Factor with padj less than user defined or default cutoff.  Each file contains a list of target genes for that Factor and associated MAGIC Matrix ChIP value.
 
+## Running Magic Generic Regions
+
+To run Magic on generic regions (rather than genes), you will need to create the magic matrix relating your regions to the Encode datasets. For this purpose, `create_magic_matrix.py` is included. `create_magic_matrix.py` will scrape Encode datasets (which you must download, instructions below) to create a matrix relating your regions to these datasets. The matrix will be saved as a python Pickle file at `Matrices/[matrix_name].pkl.gz`. The encode data is expected to be saved to `Encode_Data/`
+Command line options are:
+
+ -b:\tPath to bed file of regions [REQUIRED]. This must contain all background regions.
+ -m:\tMatrix name. Default = matrix_from_regions [OPTIONAL].-r:\tRegion type. Default = REGION [OPTIONAL]. This will be the column name of the region IDs in the matrix
+
+To speed up the process, you can run `create_magic_matrix.py` on subsets of the encode data and then merge the resulting matrices together.
+
+### Downloading encode datasets
+
+The encode datasets for all chip-seq assays can be downloaded using the following query:
+`https://www.encodeproject.org/matrix/?searchTerm=chip-seq&type=Experiment&target.investigated_as=transcription+factor&files.file_type=bed+narrowPeak&award.project=ENCODE`
+
+After clicking downloaded, a single file named `files.txt` will be donwloaded. This file contains a url to each dataset. Move `files.txt` into the `Encode_Data` folder and run the command `xargs -L 1 curl -O -J -L < files.txt` to download the datasets into the `Encode_Data` folder.

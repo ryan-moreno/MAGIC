@@ -1,26 +1,49 @@
 #!/usr/bin/env python
 
 from pathlib import Path
+import os
 
 ###################################################################################
 
 
-def make_magic_folder(_path):
+def list_filenames(folder, allowed_extensions):
+    # get all files in folder
+    files = os.listdir(folder)
+    # subset files with correct extension
+    subset_files = []
+    for ext in allowed_extensions:
+        subset_files += [f for f in files if f.endswith(ext)]
+    # remove duplicates
+    subset_files = list(set(subset_files))
+
+    return files
+
+
+###################################################################################
+
+
+def get_dir(_path):
     # get parent directory
     parent_dir = Path(_path).parent
+    return parent_dir
 
+
+###################################################################################
+
+
+def make_magic_folder(_output_folder):
     # make results folder name
 
     results_dir = "MAGIC"
     counter = 2
 
-    while Path(parent_dir / results_dir).exists():
+    while Path(_output_folder / results_dir).exists():
         results_dir = f"MAGIC_{counter}"
         counter += 1
 
-    Path.mkdir(parent_dir / results_dir)
+    Path.mkdir(_output_folder / results_dir)
 
-    MAGIC_output_dir = str(parent_dir / results_dir)
+    MAGIC_output_dir = str(_output_folder / results_dir)
 
     return MAGIC_output_dir
 
