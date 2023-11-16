@@ -136,12 +136,6 @@ background_regions = pr.PyRanges(background_regions)
 # scrape encode data for transcription factor ChIP-seq data
 magic_matrix = pd.DataFrame(data={region_colname: background_regions.Name})
 filenames = fh.list_filenames(encode_data_folder, ["bed.gz", "bed"])
-# TODO: just for testing; remove this
-filenames = [
-    filename
-    for filename in filenames
-    if "ENCFF002DAF" in filename or "ENCFF003AMQ" in filename
-]
 
 for idx, filename in enumerate(filenames):
     print(f"Parsing chip seq file [{idx+1}/{len(filenames)}]: {filename}")
