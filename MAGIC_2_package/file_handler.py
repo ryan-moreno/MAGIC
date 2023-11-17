@@ -5,7 +5,6 @@ import os
 
 ###################################################################################
 
-<<<<<<< HEAD
 
 def list_filenames(folder, allowed_extensions):
     # get all files in folder
@@ -52,31 +51,6 @@ def make_magic_folder(_output_folder):
 ###################################################################################
 
 
-
-def make_magic_folder(_path):
-    # get parent directory
-    parent_dir = Path(_path).parent
-
-    # make results folder name
-
-    results_dir = "MAGIC"
-    counter = 2
-
-    while Path(parent_dir / results_dir).exists():
-        results_dir = f"MAGIC_{counter}"
-        counter += 1
-
-    Path.mkdir(parent_dir / results_dir)
-
-    MAGIC_output_dir = str(parent_dir / results_dir)
-
-    return MAGIC_output_dir
-
-
-###################################################################################
-
-
->>>>>>> master
 def make_subfolders(output_folder, analysis_name):
     # make results folder for gene list
     # using Path from pathlib to generate paths without having to worry about OS

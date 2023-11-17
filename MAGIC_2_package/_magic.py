@@ -140,8 +140,8 @@ def get_ls_path():
 	Subsequent columns contain gene lists of interest.
 	\nPlace the *.txt or *.csv file into a folder where you wish the results to appear.
 	Then drag the file into this terminal or enter it's file path here.
-    \nNote: If you wish to run Magic by generic regions rather than by genes, use those region IDs.
-    \nThe matrix will need to contain those region IDs as well.
+	\nNote: If you wish to run Magic by generic regions rather than by genes, use those region IDs.
+	\nThe matrix will need to contain those region IDs as well.
 	 """
     )
 
