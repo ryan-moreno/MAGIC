@@ -138,7 +138,7 @@ magic_matrix = pd.DataFrame(data={region_colname: background_regions.Name})
 filenames = fh.list_filenames(encode_data_folder, ["bed.gz", "bed"])
 
 for idx, filename in enumerate(filenames):
-    print(f"Parsing chip seq file [{idx+1}/{len(filenames)}]: {filename}")
+    print(f"Parsing chip seq file [{idx+1}/{len(filenames)}]: {filename}\n")
     file_path = Path(encode_data_folder / filename)
     encode_bed = read_narrow_peaks_bed(file_path)
 
@@ -159,7 +159,7 @@ for idx, filename in enumerate(filenames):
 
         if index % 1000 == 0:
             print(
-                f"   Parsing region [{index+1}/{len(exp_regions_matrix)}]: {region_id}"
+                f"   Parsing region [{index+1}/{len(exp_regions_matrix)}]: {region_id}\n"
             )
 
         # Select the highest chip-seq motif signal value that overlaps with the enhancers
