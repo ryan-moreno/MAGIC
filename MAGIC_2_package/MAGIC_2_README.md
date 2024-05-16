@@ -67,8 +67,8 @@ To speed up the process, you can run `create_magic_matrix.py` on subsets of the 
 
 ### Downloading encode datasets
 
-The encode datasets for all chip-seq assays of the human genome can be downloaded using the following query:
-`https://www.encodeproject.org/matrix/?searchTerm=chip-seq&type=Experiment&target.investigated_as=transcription+factor&files.file_type=bed+narrowPeak&award.project=ENCODE&replicates.library.biosample.donor.organism.scientific_name=Homo+sapiens`
+The encode datasets for all chip-seq assays of the human genome (GRCh38) can be downloaded using the following query:
+`https://www.encodeproject.org/matrix/?searchTerm=chip-seq&type=Experiment&target.investigated_as=transcription+factor&files.file_type=bed+narrowPeak&award.project=ENCODE&replicates.library.biosample.donor.organism.scientific_name=Homo+sapiens&assembly=GRCh38`
 
 After clicking downloaded, a single file named `files.txt` will be donwloaded. This file contains a url to each dataset. Move `files.txt` into the `Encode_Data` folder and run the command `xargs -L 1 curl -O -J -L < files.txt` to download the datasets into the `Encode_Data` folder.
 
