@@ -16,7 +16,7 @@ def list_filenames(folder, allowed_extensions):
     # remove duplicates
     subset_files = list(set(subset_files))
 
-    return files
+    return subset_files
 
 
 ###################################################################################

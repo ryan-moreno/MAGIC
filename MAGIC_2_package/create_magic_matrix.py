@@ -72,7 +72,7 @@ def get_cmd_line_args(params):
 
 
 def read_narrow_peaks_bed(file_path):
-    bed_table = pr.read_bed(str(file_path))
+    bed_table = pr.read_bed(str(file_path), as_df=True)
     bed_table.columns = [
         "Chromosome",
         "Start",
@@ -118,11 +118,10 @@ encode_metadata["file_id"] = encode_metadata["File accession"]
 
 # read in bed file with regions of interest
 background_regions = pr.read_bed(str(bed_input_path), as_df=True)
+
 # the other columns are not used and may have an incorrect column name from read_bed
 background_regions = background_regions[["Chromosome", "Start", "End"]]
-background_regions = background_regions.sort_values(
-    ["Chromosome", "Start", "End"]
-).reset_index()
+background_regions = background_regions.sort_values(["Chromosome", "Start", "End"])
 background_regions["Name"] = (
     background_regions.Chromosome.astype(str)
     + ":"
@@ -130,12 +129,12 @@ background_regions["Name"] = (
     + "-"
     + background_regions.End.astype(str)
 )
-# Store back in PyRanges object after sorting
-background_regions = pr.PyRanges(background_regions)
+background_regions.set_index("Name", inplace=True)
 
 # scrape encode data for transcription factor ChIP-seq data
-magic_matrix = pd.DataFrame(data={region_colname: background_regions.Name})
+magic_matrix = pd.DataFrame(data={region_colname: background_regions.index})
 filenames = fh.list_filenames(encode_data_folder, ["bed.gz", "bed"])
+filenames.sort()
 
 for idx, filename in enumerate(filenames):
     print(f"Parsing chip seq file [{idx+1}/{len(filenames)}]: {filename}\n")
@@ -143,6 +142,9 @@ for idx, filename in enumerate(filenames):
     encode_bed = read_narrow_peaks_bed(file_path)
 
     exp_id = filename.split(".")[0]
+    if exp_id not in encode_metadata.file_id.values:
+        print(f"Experiment {exp_id} not in metadata file. Skipping.\n")
+        continue
     exp_metadata = encode_metadata[encode_metadata.file_id == exp_id]
     transcription_factor = exp_metadata.transcription_factor.values[0]
     exp_name = ":".join([str(exp_id), str(transcription_factor)])
@@ -152,19 +154,35 @@ for idx, filename in enumerate(filenames):
     )
 
     # loop over regions of interest to find highest signal value for each region
-    # TODO: replace with dataframe.apply for speed
     for index, row in exp_regions_matrix.iterrows():
-        region_id = row[region_colname]
-        region = background_regions[background_regions.Name == region_id]
-
         if index % 1000 == 0:
-            print(
-                f"   Parsing region [{index+1}/{len(exp_regions_matrix)}]: {region_id}\n"
+            print(f"   Parsing region [{index+1}/{len(exp_regions_matrix)}]\n")
+
+        region = background_regions.loc[row[region_colname], :]
+        region_chr = region.Chromosome
+        region_start = region.Start
+        region_end = region.End
+
+        # Consider encode_bed_region overlapping region if on the same chromosome and
+        # endcode_bed_region start or end is within region or encode_bed_region covers entire region
+        region_overlap = encode_bed[
+            (encode_bed.Chromosome == region_chr)
+            & (
+                (
+                    (
+                        (encode_bed.Start >= region_start)
+                        & (encode_bed.Start <= region_end)
+                    )
+                    | (
+                        (encode_bed.End >= region_start)
+                        & (encode_bed.End <= region_end)
+                    )
+                )
+                | ((encode_bed.Start <= region_start) & (encode_bed.End >= region_end))
             )
+        ]
 
-        # Select the highest chip-seq motif signal value that overlaps with the enhancers
-        region_overlap = encode_bed.overlap(region)
-
+        # Select the highest chip-seq motif signal value that overlaps with the enhancer
         if region_overlap.empty:
             highest_signal_value = 0
         else:

@@ -19,7 +19,7 @@ Command line options are:
 
 -f	File path to lists file [REQUIRED].
 -p:	Maximum acceptable adjusted p value for figure generation. Default=0.25  [OPTIONAL].
--t:	Minimum number of target genes for Factor to be called. Default=10 [OPTIONAL].
+-t:	Minimum number of target genes/regions for Factor to be called. Default=10 [OPTIONAL].
 -m:	Path to matrix file. Default = /Matrices/1Kb_gene.pkl.gz [OPTIONAL].
 -g:	Keep General Transcription Factors and RNApol in analysis (y/n).  Default = y [OPTIONAL].  
 -z:	Keep zero ChiP values (y/n). Default = n [OPTIONAL]
