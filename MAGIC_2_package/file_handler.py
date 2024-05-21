@@ -9,10 +9,12 @@ import os
 def list_filenames(folder, allowed_extensions):
     # get all files in folder
     files = os.listdir(folder)
+
     # subset files with correct extension
     subset_files = []
     for ext in allowed_extensions:
         subset_files += [f for f in files if f.endswith(ext)]
+
     # remove duplicates
     subset_files = list(set(subset_files))
 
@@ -37,11 +39,14 @@ def make_magic_folder(_output_folder):
     results_dir = "MAGIC"
     counter = 2
 
+    if type(_output_folder) == str:
+        _output_folder = Path(_output_folder)
+
     while Path(_output_folder / results_dir).exists():
         results_dir = f"MAGIC_{counter}"
         counter += 1
 
-    Path.mkdir(_output_folder / results_dir)
+    folder_path = Path.mkdir(_output_folder / results_dir)
 
     MAGIC_output_dir = str(_output_folder / results_dir)
 

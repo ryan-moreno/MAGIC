@@ -238,7 +238,7 @@ if __name__ == "__main__":
 # If no output folder given, we will store the output in the same
 # folder as the one containing the lists file
 if len(params["output_folder"]) == 0:
-    params["output_folder"] = params["ls_path"]
+    params["output_folder"] = fh.get_dir(params["ls_path"])
 
 mtx_path = params["matrix"]
 keep_gtfs = params["keep_gtfs"]
@@ -246,25 +246,30 @@ padj_cutoff = params["padj_cutoff"]
 min_targets = params["min_targets"]
 ls_path = params["ls_path"]
 keep_zeros = params["keep_zeros"]
-output_folder = fh.get_dir(params["output_folder"])
+output_folder = params["output_folder"]
 region_colname = params["region_type"]
 
 # get matrix and filter out GTFs if required
 mtx = pd.read_pickle(mtx_path)
 mtx.iloc[:, 1:] = mtx.iloc[:, 1:].astype("float64")  # do this for plotly compatibilty
 
+# check for duplicated column names
+if len(mtx.columns) != len(set(mtx.columns)):
+    print(" - DUPLICATED COLUMN NAMES IN MATRIX. FIX AND RESTART")
+    exit()
+
 if keep_gtfs == "N":
     keep_cols = [region_colname]
-    for e in mtx.columns[1:]:
-        tf = e.split(":")[-1]
+    for expt in mtx.columns[1:]:
+        tf = expt.split(":")[-1]
         if tf[:3] not in gtfs:
-            keep_cols.append(e)
+            keep_cols.append(expt)
 
     mtx = mtx[keep_cols]
 
 
 # format matrix region IDs to upper case
-mtx_ls = [g.strip("'") for g in mtx[region_colname].to_list()]
+mtx_ls = [g.strip("'").upper() for g in mtx[region_colname].to_list()]
 mtx[region_colname] = mtx_ls
 
 
@@ -321,36 +326,39 @@ for region_ls in lists:
     # key = expt, val = df of regions and chip vals for current expt
     target_data = dict()
 
-    for e in expts:
-        sys.stdout.write(
+    for expt in expts:
+        print(
             f" - List {list_counter}/{len(lists)}. Expt {expt_counter} of {len(expts)}           \r"
         )
-        sys.stdout.flush()
 
-        # print (f" - List {list_counter}/{len(lists)}. Expt {expt_counter} of {len(expts)}.  {e}")
         # make df of regions and chip vals for current expt in matrix
-        df = mtx[[region_colname, e]]
+        df = mtx[[region_colname, expt]]
 
         # and eliminate zero binders if required
         if keep_zeros == "N":
-            df = df[df[e] > 0]
+            df = df[df[expt] > 0]
 
         # get master chip values
-        m_vals = df[e].to_list()
+        m_vals = df[expt].to_list()
 
         # make df with just query genes
         qdf = df[df[region_colname].isin(q_ls)]
 
         # ... and get query chip vals
-        q_vals = qdf[e].to_list()
+        q_vals = qdf[expt].to_list()
 
         # store master and query df in dict. key = expt
-        chip_vals[e] = [df, qdf]
+        chip_vals[expt] = [df, qdf]
 
         # perform 1 tailed kolmogorov-Smirnov test
         try:
             D, p = sc.ks_2samp(m_vals, q_vals, alternative="greater", method="asymp")
-        except:
+        except Exception as exception:
+            print(
+                f"Error during computation of kolmogorov-Smirnov test for experiment {expt}. Skipping."
+            )
+            print(f"\t-> {exception}")
+            expt_counter += 1
             continue
 
         # get arg_d and arg_d_index (arg_d = chip value, arg_d_index is posn in array)
@@ -361,25 +369,26 @@ for region_ls in lists:
 
         # get target genes
         # trim df to genes with chip>arg_d
-        high_val_df = df[df[e] > arg_d]
+        high_val_df = df[df[expt] > arg_d]
 
         # sort df by chip value ranks (0=poorest, 1=best)
-        high_val_df = high_val_df.sort_values(by=e, ascending=True)
+        high_val_df = high_val_df.sort_values(by=expt, ascending=True)
 
         # trim for genes in query list
         target_df = high_val_df[high_val_df[region_colname].isin(q_ls)]
 
         # only keep TF if more than min_targets target genes.
         if len(target_df) < min_targets:
-            continue
+            print(f"{expt} did not have enough target genes. Skipping.")
+            expt_counter += 1
 
         # reverse order so df goes from best to worst chip value
-        target_df = target_df.sort_values(by=e, ascending=False)
+        target_df = target_df.sort_values(by=expt, ascending=False)
 
         # add target df to targets dict.  key = expt, val = target df
-        target_data[e] = target_df
+        target_data[expt] = target_df
 
-        res_df.loc[e] = [D, arg_d, p, score]
+        res_df.loc[expt] = [D, arg_d, p, score]
 
         expt_counter += 1
 
@@ -418,6 +427,7 @@ for region_ls in lists:
             target_data=target_data,
             padj_cutoff=padj_cutoff,
             folder=paths["target_fol"],
+            region_colname=region_colname,
         )
 
         print(" - Writing gmx file.")
@@ -427,6 +437,7 @@ for region_ls in lists:
             target_data=target_data,
             padj_cutoff=padj_cutoff,
             f_path=paths["Factor_gmx"],
+            region_colname=region_colname,
         )
 
         print(" - Generating summary figure.\n")
@@ -443,6 +454,7 @@ for region_ls in lists:
             chip_vals=chip_vals,
             padj_cutoff=padj_cutoff,
             fig_folder=paths["distributions"],
+            region_colname=region_colname,
         )
 
     list_counter += 1

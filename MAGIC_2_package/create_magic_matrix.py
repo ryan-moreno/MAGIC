@@ -5,6 +5,7 @@ import pyranges as pr
 import sys
 from pathlib import Path
 import file_handler as fh
+import time
 
 
 def get_cmd_line_args(params):
@@ -102,14 +103,13 @@ params = {
 
 # get params from command line
 params = get_cmd_line_args(params)
-
 bed_input_path = Path(params["bed_path"])
 matrix_output_path = Path(f"{_dir}/Matrices/{params['matrix_name']}.pkl.gz")
 encode_metadata_path = Path(f"{_dir}/Encode_Data/metadata.tsv")
 encode_data_folder = Path(f"{_dir}/Encode_Data")
 region_colname = params["region_type"]
 
-# Read in metadata for Encode data
+# read in metadata for Encode data
 encode_metadata = pd.read_table(encode_metadata_path)
 encode_metadata["transcription_factor"] = (
     encode_metadata["Experiment target"].str.split("-").str[0]
@@ -136,21 +136,30 @@ magic_matrix = pd.DataFrame(data={region_colname: background_regions.index})
 filenames = fh.list_filenames(encode_data_folder, ["bed.gz", "bed"])
 filenames.sort()
 
+
+# loop over all Encode chip-seq files (.bed or .bed.gz)
 for idx, filename in enumerate(filenames):
+    start_chipseq_file_time = time.time()
+
     print(f"Parsing chip seq file [{idx+1}/{len(filenames)}]: {filename}\n")
+
     file_path = Path(encode_data_folder / filename)
     encode_bed = read_narrow_peaks_bed(file_path)
 
     exp_id = filename.split(".")[0]
+
+    # Only use the experiments that are listed in the Encode/metadata.tsv file
     if exp_id not in encode_metadata.file_id.values:
         print(f"Experiment {exp_id} not in metadata file. Skipping.\n")
         continue
+
     exp_metadata = encode_metadata[encode_metadata.file_id == exp_id]
     transcription_factor = exp_metadata.transcription_factor.values[0]
     exp_name = ":".join([str(exp_id), str(transcription_factor)])
 
+    # data frame for the current experiment
     exp_regions_matrix = pd.DataFrame(
-        data={region_colname: magic_matrix[region_colname], exp_name: 0}
+        data={region_colname: magic_matrix[region_colname], exp_name: 0.0}
     )
 
     # loop over regions of interest to find highest signal value for each region
@@ -163,7 +172,7 @@ for idx, filename in enumerate(filenames):
         region_start = region.Start
         region_end = region.End
 
-        # Consider encode_bed_region overlapping region if on the same chromosome and
+        # consider encode_bed_region overlapping region if on the same chromosome and
         # endcode_bed_region start or end is within region or encode_bed_region covers entire region
         region_overlap = encode_bed[
             (encode_bed.Chromosome == region_chr)
@@ -182,7 +191,7 @@ for idx, filename in enumerate(filenames):
             )
         ]
 
-        # Select the highest chip-seq motif signal value that overlaps with the enhancer
+        # select the highest chip-seq motif signal value that overlaps with the enhancer
         if region_overlap.empty:
             highest_signal_value = 0
         else:
@@ -190,9 +199,13 @@ for idx, filename in enumerate(filenames):
 
         exp_regions_matrix.loc[index, exp_name] = highest_signal_value
 
-    # Add column to magic matrix if signal from experiment was found in at least one region of interest
+    # add column to magic matrix if signal from experiment was found in at least one region of interest
     if not (exp_regions_matrix[exp_name] == 0).all():
         magic_matrix = pd.concat([magic_matrix, exp_regions_matrix[exp_name]], axis=1)
 
-# Pickle the magic matrix
+    # print time to parse the chipseq file
+    elapsed_chipseq_time = time.time() - start_chipseq_file_time
+    print(f"    Time to parse chipseq file: {elapsed_chipseq_time:.4f} seconds\n")
+
+# pickle the magic matrix
 magic_matrix.to_pickle(matrix_output_path)
