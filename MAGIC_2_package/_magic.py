@@ -48,12 +48,15 @@ def get_cmd_line_args(params):
     "min_targets": 10,
     "keep_gtfs": "Y",
     "keep_zeros": "Y"
+    "output_folder": folder from ls_path
+    "region_type": "GENE"
 
     }
     """
 
     cmd = sys.argv
     script_path = cmd.pop(0)
+    _dir = Path(script_path).parent
 
     help_text = """
  -f:\tPath to lists file [REQUIRED].
@@ -61,7 +64,9 @@ def get_cmd_line_args(params):
  -t:\tMinimum number of target genes for Factor to be called. Default=10 [OPTIONAL].
  -m:\tPath to matrix file. Default = /Matrices/1Kb_gene.pkl.gz [OPTIONAL].
  -g:\tKeep General Transcription Factors and RNApol in analysis (y/n).  Default = y [OPTIONAL].
- -z:\tKeep zero chip values (y/n). Default = y [OPTIONAL]  
+ -z:\tKeep zero chip values (y/n). Default = y [OPTIONAL]
+ -o:\tOutput folder. Default = folder to lists file [OPTIONAL]
+ -r:\tName of regions column in matrix. Default = GENE [OPTIONAL]
 	"""
 
     # cycle through cmd line, get keys and check vals
@@ -80,6 +85,18 @@ def get_cmd_line_args(params):
 
         if _opt == "-t":
             params["min_targets"] = int(cmd.pop(0))
+            continue
+
+        if _opt == "-m":
+            params["matrix"] = Path(cmd.pop(0))
+            continue
+
+        if _opt == "-o":
+            params["output_folder"] = f"{cmd.pop(0)}"
+            continue
+
+        if _opt == "-r":
+            params["region_type"] = f"{cmd.pop(0)}"
             continue
 
         if _opt == "-g":
@@ -105,8 +122,6 @@ def get_cmd_line_args(params):
         print(help_text)
         exit()
 
-    return params
-
 
 ######################################################################################################
 def get_ls_path():
@@ -124,7 +139,9 @@ def get_ls_path():
 	The 'tighter' this list, the more robust the statistics will be.
 	Subsequent columns contain gene lists of interest.
 	\nPlace the *.txt or *.csv file into a folder where you wish the results to appear.
-	Then drag the file into this terminal or enter it's file path here.\n
+	Then drag the file into this terminal or enter it's file path here.
+	\nNote: If you wish to run Magic by generic regions rather than by genes, use those region IDs.
+	\nThe matrix will need to contain those region IDs as well.
 	 """
     )
 
@@ -188,6 +205,7 @@ def make_ls_df(ls_path):
 ######################################################################################################
 
 script_path = sys.argv[0]
+_dir = Path(script_path).parent
 
 # default params.
 
@@ -196,11 +214,13 @@ gtfs = ["TBP", "POL", "GTF", "TAF"]
 params = {
     "script_path": script_path,
     "ls_path": "",
-    "matrix": Path(f"{script_path}/Matrices/1Kb_gene.pkl.gz"),
+    "matrix": Path(f"{_dir}/Matrices/1Kb_gene.pkl.gz"),
     "keep_gtfs": "Y",
     "keep_zeros": "N",
     "padj_cutoff": 0.25,
     "min_targets": 10,
+    "output_folder": "",
+    "region_type": "GENE",
 }
 
 if __name__ == "__main__":
@@ -215,38 +235,46 @@ if __name__ == "__main__":
         params["keep_gtfs"] = get_gtf_option()
         params["keep_zeros"] = keep_zero_option()
 
+# If no output folder given, we will store the output in the same
+# folder as the one containing the lists file
+if len(params["output_folder"]) == 0:
+    params["output_folder"] = fh.get_dir(params["ls_path"])
 
-# get working directory and params
-_dir = Path(params["script_path"]).parent
-
-mtx_path = Path(f"{_dir}/Matrices/1Kb_gene.pkl.gz")
+mtx_path = params["matrix"]
 keep_gtfs = params["keep_gtfs"]
 padj_cutoff = params["padj_cutoff"]
 min_targets = params["min_targets"]
 ls_path = params["ls_path"]
 keep_zeros = params["keep_zeros"]
+output_folder = params["output_folder"]
+region_colname = params["region_type"]
 
 # get matrix and filter out GTFs if required
 mtx = pd.read_pickle(mtx_path)
 mtx.iloc[:, 1:] = mtx.iloc[:, 1:].astype("float64")  # do this for plotly compatibilty
 
+# check for duplicated column names
+if len(mtx.columns) != len(set(mtx.columns)):
+    print(" - DUPLICATED COLUMN NAMES IN MATRIX. FIX AND RESTART")
+    exit()
+
 if keep_gtfs == "N":
-    keep_cols = ["GENE"]
-    for e in mtx.columns[1:]:
-        tf = e.split(":")[-1]
+    keep_cols = [region_colname]
+    for expt in mtx.columns[1:]:
+        tf = expt.split(":")[-1]
         if tf[:3] not in gtfs:
-            keep_cols.append(e)
+            keep_cols.append(expt)
 
     mtx = mtx[keep_cols]
 
 
-# format matrix genes to upper case
-mtx_ls = [g.strip("'") for g in mtx["GENE"].to_list()]
-mtx["GENE"] = mtx_ls
+# format matrix region IDs to upper case
+mtx_ls = [g.strip("'").upper() for g in mtx[region_colname].to_list()]
+mtx[region_colname] = mtx_ls
 
 
 # make results folder
-MAGIC_output_path = fh.make_magic_folder(ls_path)
+MAGIC_output_path = fh.make_magic_folder(output_folder)
 
 
 # make lists df
@@ -262,16 +290,16 @@ if master_ls[0] == "!!":
 
 
 # trim matrix to master list and modify master list accordingly
-mtx = mtx[mtx["GENE"].isin(master_ls)]
-master_ls = mtx["GENE"].to_list()
+mtx = mtx[mtx[region_colname].isin(master_ls)]
+master_ls = mtx[region_colname].to_list()
 
 # get experiments from matrix
 expts = list(mtx.columns)[1:]
 
 list_counter = 1
-for gene_ls in lists:
-    # make results folder, subfolders and file paths for this gene list
-    paths = fh.make_subfolders(output_folder=MAGIC_output_path, analysis_name=gene_ls)
+for region_ls in lists:
+    # make results folder, subfolders and file paths for this region list
+    paths = fh.make_subfolders(output_folder=MAGIC_output_path, analysis_name=region_ls)
     """
 	paths["target_fol"]  folder for target data
 	paths["distributions"] folder for distribution figs
@@ -281,8 +309,8 @@ for gene_ls in lists:
 	paths["summary_fig"] pdf file
 	"""
 
-    # get query genes for current list
-    q_ls = ls_df[gene_ls].dropna().str.upper().to_list()
+    # get query regions for current list
+    q_ls = ls_df[region_ls].dropna().str.upper().to_list()
 
     # make results df to populate later.  rows = expts in matrix, cols = stats
     res_df = pd.DataFrame(index=expts, columns=["D", "argD", "p", "Score"])
@@ -293,41 +321,44 @@ for gene_ls in lists:
     # Will be used to generate CDF figures.
     chip_vals = dict()  # key = expt, val = [master df, query df]
 
-    # make dict to hold target genes and chip values as df for each experiment in matrix
-    # will be used to generate Target files (genes and chip values for positive expts)
-    # key = expt, val = df of genes and chip vals for current expt
+    # make dict to hold target regions and chip values as df for each experiment in matrix
+    # will be used to generate Target files (regions and chip values for positive expts)
+    # key = expt, val = df of regions and chip vals for current expt
     target_data = dict()
 
-    for e in expts:
-        sys.stdout.write(
+    for expt in expts:
+        print(
             f" - List {list_counter}/{len(lists)}. Expt {expt_counter} of {len(expts)}           \r"
         )
-        sys.stdout.flush()
 
-        # print (f" - List {list_counter}/{len(lists)}. Expt {expt_counter} of {len(expts)}.  {e}")
-        # make df of genes and chip vals for current expt in matrix
-        df = mtx[["GENE", e]]
+        # make df of regions and chip vals for current expt in matrix
+        df = mtx[[region_colname, expt]]
 
         # and eliminate zero binders if required
         if keep_zeros == "N":
-            df = df[df[e] > 0]
+            df = df[df[expt] > 0]
 
         # get master chip values
-        m_vals = df[e].to_list()
+        m_vals = df[expt].to_list()
 
         # make df with just query genes
-        qdf = df[df["GENE"].isin(q_ls)]
+        qdf = df[df[region_colname].isin(q_ls)]
 
         # ... and get query chip vals
-        q_vals = qdf[e].to_list()
+        q_vals = qdf[expt].to_list()
 
         # store master and query df in dict. key = expt
-        chip_vals[e] = [df, qdf]
+        chip_vals[expt] = [df, qdf]
 
         # perform 1 tailed kolmogorov-Smirnov test
         try:
             D, p = sc.ks_2samp(m_vals, q_vals, alternative="greater", method="asymp")
-        except:
+        except Exception as exception:
+            print(
+                f"Error during computation of kolmogorov-Smirnov test for experiment {expt}. Skipping."
+            )
+            print(f"\t-> {exception}")
+            expt_counter += 1
             continue
 
         # get arg_d and arg_d_index (arg_d = chip value, arg_d_index is posn in array)
@@ -338,25 +369,26 @@ for gene_ls in lists:
 
         # get target genes
         # trim df to genes with chip>arg_d
-        high_val_df = df[df[e] > arg_d]
+        high_val_df = df[df[expt] > arg_d]
 
         # sort df by chip value ranks (0=poorest, 1=best)
-        high_val_df = high_val_df.sort_values(by=e, ascending=True)
+        high_val_df = high_val_df.sort_values(by=expt, ascending=True)
 
         # trim for genes in query list
-        target_df = high_val_df[high_val_df["GENE"].isin(q_ls)]
+        target_df = high_val_df[high_val_df[region_colname].isin(q_ls)]
 
         # only keep TF if more than min_targets target genes.
         if len(target_df) < min_targets:
-            continue
+            print(f"{expt} did not have enough target genes. Skipping.")
+            expt_counter += 1
 
         # reverse order so df goes from best to worst chip value
-        target_df = target_df.sort_values(by=e, ascending=False)
+        target_df = target_df.sort_values(by=expt, ascending=False)
 
         # add target df to targets dict.  key = expt, val = target df
-        target_data[e] = target_df
+        target_data[expt] = target_df
 
-        res_df.loc[e] = [D, arg_d, p, score]
+        res_df.loc[expt] = [D, arg_d, p, score]
 
         expt_counter += 1
 
@@ -389,12 +421,13 @@ for gene_ls in lists:
     # draw figs and generate target data is any TFs pass padj_cutoff
     if summary_df["padj"].min() <= padj_cutoff:
         print("\n - Writing target data.")
-        # write target data (gene and chip value for each TF)
+        # write target data (region and chip value for each TF)
         write_target_data(
             summary_df=summary_df,
             target_data=target_data,
             padj_cutoff=padj_cutoff,
             folder=paths["target_fol"],
+            region_colname=region_colname,
         )
 
         print(" - Writing gmx file.")
@@ -404,6 +437,7 @@ for gene_ls in lists:
             target_data=target_data,
             padj_cutoff=padj_cutoff,
             f_path=paths["Factor_gmx"],
+            region_colname=region_colname,
         )
 
         print(" - Generating summary figure.\n")
@@ -420,6 +454,7 @@ for gene_ls in lists:
             chip_vals=chip_vals,
             padj_cutoff=padj_cutoff,
             fig_folder=paths["distributions"],
+            region_colname=region_colname,
         )
 
     list_counter += 1

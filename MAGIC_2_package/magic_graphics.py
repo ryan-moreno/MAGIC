@@ -13,7 +13,7 @@ import pandas as pd
 ########################################################################################################
 
 
-def histplot(summary_df, chip_vals, padj_cutoff, fig_folder):
+def histplot(summary_df, chip_vals, padj_cutoff, fig_folder, region_colname):
     """
     chip_vals = dict of dfs key = expt, val = [master df, query df]
     where master and query dfs are genes and chip vals as columns
@@ -42,10 +42,10 @@ def histplot(summary_df, chip_vals, padj_cutoff, fig_folder):
         df["type"] = ["master"] * len(mdf) + ["query"] * len(qdf)
 
         # get gene names for annotation
-        genes = df["GENE"].to_list()
+        genes = df[region_colname].to_list()
 
         # D argument for plotting
-        argD = float(summary_df[summary_df["Experiment"] == ex]["argD"])
+        argD = float(summary_df[summary_df["Experiment"] == ex]["argD"].iloc[0])
 
         # make figure with 3 subplots - in a column with shared x axis
         fig = make_subplots(
@@ -105,7 +105,7 @@ def histplot(summary_df, chip_vals, padj_cutoff, fig_folder):
         fig.update_layout(barmode="overlay")
 
         # make title.  get padj to 4 decimal.
-        padj = float(summary_df[summary_df["Experiment"] == ex]["padj"])
+        padj = float(summary_df[summary_df["Experiment"] == ex]["padj"].iloc[0])
         title = f"Factor:{tf}  padj={padj:.2e}"  # {x:.2e} return 2 decimal places to scientific notation numbers
 
         fig.update_layout(title_text=title)
